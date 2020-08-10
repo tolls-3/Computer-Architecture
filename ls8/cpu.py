@@ -11,6 +11,14 @@ class CPU:
         self.ram = [0] * 256
         self.reg = [0] * 8
         self.pc = 0
+        self.running = True
+
+        self.branch_table = {
+            0b00000001: self.op_HLT,
+            0b10000010: self.op_LDI,
+            0b01000111: self.op_PRN,
+            0b10100010: self.op_MUL
+        }
 
     def ram_read(self, MAR):
         MDR = self.ram[MAR]
@@ -22,24 +30,24 @@ class CPU:
     def load(self):
         """Load a program into memory."""
 
-        address = 0
+        # address = 0
 
-        # # For now, we've just hardcoded a program:
+        # # # For now, we've just hardcoded a program:
 
-        program = [
-            0b10000010,  # LDI R0,8
-            0b00000000,
-            0b00001000,
-            0b10000010,  # LDI R1,9
-            0b00000001,
-            0b00001001,
-            0b10100010,  # MUL R0,R1
-            0b00000000,
-            0b00000001,
-            0b01000111,  # PRN R0
-            0b00000000,
-            0b00000001,  # HLT
-        ]
+        # program = [
+        #     0b10000010,  # LDI R0,8
+        #     0b00000000,
+        #     0b00001000,
+        #     0b10000010,  # LDI R1,9
+        #     0b00000001,
+        #     0b00001001,
+        #     0b10100010,  # MUL R0,R1
+        #     0b00000000,
+        #     0b00000001,
+        #     0b01000111,  # PRN R0
+        #     0b00000000,
+        #     0b00000001,  # HLT
+        # ]
 
         # program = [
         #     # From print8.ls8
@@ -51,26 +59,26 @@ class CPU:
         #     0b00000001,  # HLT
         # ]
 
-        for instruction in program:
-            self.ram[address] = instruction
-            address += 1
+        # for instruction in program:
+        #     self.ram[address] = instruction
+        #     address += 1
 
-        # filename = sys.argv[1]
-        # try:
-        #     address = 0
-        #     with open(filename) as f:
-        #         for line in f:
-        #             line = line.split('#')[0]
-        #             command = line.strip()
-        #             if command == '':
-        #                 continue
-        #             instruction = int(command, 2)
-        #             self.ram_write(address, instruction)
+        filename = sys.argv[1]
+        try:
+            address = 0
+            with open(filename) as f:
+                for line in f:
+                    line = line.split('#')[0]
+                    command = line.strip()
+                    if command == '':
+                        continue
+                    instruction = int(command, 2)
+                    self.ram_write(address, instruction)
 
-        #             address += 1
-        # except FileNotFoundError:
-        #     print(f'{sys.argv[0]}: {sys.argv[1]} file was not found')
-        #     sys.exit()
+                    address += 1
+        except FileNotFoundError:
+            print(f'{sys.argv[0]}: {sys.argv[1]} file was not found')
+            sys.exit()
 
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
@@ -109,33 +117,36 @@ class CPU:
     def prn(self, operand_a):
         print(operand_a)
 
+    def return_operands(self):
+        operand_a = self.ram_read(self.pc + 1)
+        operand_b = self.ram_read(self.pc + 2)
+        return operand_a, operand_b
+
+    def op_LDI(self):
+        operand_a, operand_b = self.return_operands()
+        self.ldi(operand_a, operand_b)
+        self.pc += 3
+
+    def op_PRN(self):
+        operand_a, _ = self.return_operands()
+        self.prn(self.reg[operand_a])
+        self.pc += 2
+
+    def op_MUL(self):
+        operand_a, operand_b = self.return_operands()
+        self.alu('MUL', operand_a, operand_b)
+        self.pc += 3
+
+    def op_HLT(self):
+        self.running = False
+
     def run(self):
         """Run the CPU."""
-        LDI = 0b10000010
-        PRN = 0b01000111
-        HLT = 0b00000001
-        MUL = 0b10100010
-
-        running = True
-
-        while running:
+        while self.running:
             IR = self.ram_read(self.pc)
 
-            operand_a = self.ram_read(self.pc + 1)
-
-            operand_b = self.ram_read(self.pc + 2)
-
-            if IR == LDI:
-                self.ldi(operand_a, operand_b)
-                self.pc += 3
-
-            if IR == PRN:
-                self.prn(self.reg[operand_a])
-                self.pc += 2
-
-            if IR == HLT:
-                running = False
-
-            if IR == MUL:
-                self.alu('MUL', operand_a, operand_b)
-                self.pc += 3
+            if IR in self.branch_table:
+                self.branch_table[IR]()
+            else:
+                print('Error or something like that!')
+                self.op_HLT()
