@@ -12,12 +12,16 @@ class CPU:
         self.reg = [0] * 8
         self.pc = 0
         self.running = True
+        self.fl = 0
+        self.sp = 7
 
         self.branch_table = {
             0b00000001: self.op_HLT,
             0b10000010: self.op_LDI,
             0b01000111: self.op_PRN,
-            0b10100010: self.op_MUL
+            0b10100010: self.op_MUL,
+            0b01000101: self.op_PUSH,
+            0b01000110: self.op_POP
         }
 
     def ram_read(self, MAR):
@@ -139,6 +143,21 @@ class CPU:
 
     def op_HLT(self):
         self.running = False
+
+    def op_PUSH(self):
+        self.reg[self.sp] -= 1
+        stack_address = self.reg[self.sp]
+        register_number = self.ram_read(self.pc + 1)
+        register_number_value = self.reg[register_number]
+        self.ram_write(stack_address, register_number_value)
+        self.pc += 2
+
+    def op_POP(self):
+        stack_value = self.ram_read(self.reg[self.sp])
+        register_number = self.ram_read(self.pc + 1)
+        self.reg[register_number] = stack_value
+        self.reg[self.sp] += 1
+        self.pc += 2
 
     def run(self):
         """Run the CPU."""
